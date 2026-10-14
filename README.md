@@ -8,27 +8,22 @@ The project focuses on maintaining consistent wallet balances when multiple oper
 
 ## 🚀 Live Demo
 
-**Swagger UI:**  
-https://paywithoutbank.onrender.com/swagger-ui/index.html
+**Live Application:** https://paywithoutbank.onrender.com
 
-**GitHub Repository:**  
-https://github.com/utkarshswastikshree-source/paywithoutbank
+**API Documentation:** https://paywithoutbank.onrender.com/swagger-ui/index.html
 
-> The application is deployed on Render. If the service has been inactive, the first request may take additional time to respond.
+Use Swagger UI to explore and test the available REST API endpoints.
 
 ## ✨ Features
 
-- Create users through REST APIs.
-- Automatically create a wallet when creating a user.
+- Create users and automatically associate wallets with them.
 - Deposit money into a wallet.
-- Transfer money between wallets.
+- Transfer money between two wallets.
 - Retrieve wallet balances.
-- Store users, wallets, and transaction records in PostgreSQL.
-- Use Spring Data JPA and Hibernate for database operations.
-- Apply pessimistic locking to wallet retrieval operations.
-- Use transactional processing for wallet updates.
-- Explore and test APIs through Swagger UI.
-- Include automated tests using JUnit 5.
+- Store wallet and transaction data in a relational database.
+- Handle wallet operations using transactional processing.
+- Use pessimistic locking to help prevent conflicting concurrent updates.
+- Test concurrent money transfers using JUnit and Spring Boot testing.
 
 ## 🛠️ Technology Stack
 
@@ -44,39 +39,37 @@ https://github.com/utkarshswastikshree-source/paywithoutbank
 | Render | Deployment |
 | JUnit 5 | Automated testing |
 | Swagger / OpenAPI | API documentation |
+| Maven | Build and dependency management |
 
 ## 🏗️ Application Architecture
 
 The application follows a layered architecture.
 
 ```text
-             Client
-          (Swagger UI)
-                |
-                v
-       REST Controllers
-                |
-                v
-          WalletService
-                |
-                v
-         JPA Repositories
-                |
-                v
-           PostgreSQL
+Client (Swagger UI)
+        |
+        v
+REST Controllers
+        |
+        v
+WalletService
+        |
+        v
+JPA Repositories
+        |
+        v
+PostgreSQL Database
 ```
 
 ### Main Components
 
-- **Controller Layer:** Handles incoming HTTP requests and API responses.
-- **Service Layer:** Implements wallet operations and business logic.
-- **Repository Layer:** Performs database operations using Spring Data JPA.
+- **Controller Layer:** Receives HTTP requests and returns API responses.
+- **Service Layer:** Implements wallet creation, deposits, transfers, and balance retrieval.
+- **Repository Layer:** Performs database operations through Spring Data JPA.
 - **Entity Layer:** Represents users, wallets, and transactions.
-- **Database:** PostgreSQL stores persistent application data.
+- **Database Layer:** Stores persistent application data.
 
 ## 🔌 API Endpoints
-
-The following endpoints are available in the Swagger documentation.
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -87,104 +80,15 @@ The following endpoints are available in the Swagger documentation.
 
 Additional endpoints may be available in Swagger UI.
 
-## 📝 Example API Requests
-
-### 1. Create a User
-
-**Endpoint**
-
-```http
-POST /api/users
-Content-Type: application/json
-```
-
-**Request Body**
-
-```json
-{
-  "name": "DemoUser",
-  "email": "demo@example.com"
-}
-```
-
-The API returns the created user's details. The service also creates an associated wallet.
-
-### 2. Deposit Money
-
-**Endpoint**
-
-```http
-POST /api/wallets/{id}/deposit
-Content-Type: application/json
-```
-
-**Example Request Body**
-
-```json
-{
-  "amount": 100
-}
-```
-
-Replace `{id}` with the actual wallet ID.
-
-### 3. Transfer Money
-
-**Endpoint**
-
-```http
-POST /api/wallets/transfer
-Content-Type: application/json
-```
-
-**Request Body**
-
-```json
-{
-  "fromWalletId": 2,
-  "toWalletId": 1,
-  "amount": 30
-}
-```
-
-This example transfers ₹30 from wallet 2 to wallet 1. The wallet IDs must exist, and the sender must have sufficient funds.
-
-### 4. Check Wallet Balance
-
-**Endpoint**
-
-```http
-GET /api/wallets/{id}/balance
-```
-
-Replace `{id}` with the wallet ID whose balance you want to retrieve.
-
-## 🧪 Manual API Testing
-
-The deployed APIs were tested through Swagger UI using test data.
-
-One verified scenario was:
-
-| Operation | Result |
-|---|---|
-| Create a user | Successful |
-| Deposit ₹100 into wallet 2 | Successful |
-| Transfer ₹30 from wallet 2 to wallet 1 | Successful |
-| Check wallet 2 balance | ₹70 |
-| Check wallet 1 balance | ₹30 |
-| Compare combined balances | ₹100 |
-
-This scenario demonstrates that the tested transfer deducted ₹30 from the sender and credited ₹30 to the receiver.
-
-## 🔒 Concurrency Control
+## 🔐 Concurrency Control
 
 ### The Problem: Race Conditions
 
-A race condition can occur when multiple requests read and update the same wallet concurrently. Without suitable concurrency control, updates may conflict and result in inconsistent balances.
+When multiple requests update the same wallet simultaneously, conflicting updates can lead to incorrect balances if concurrency is not handled properly.
 
 ### Pessimistic Locking
 
-The wallet repository uses a pessimistic write lock:
+The wallet repository uses a pessimistic write lock when fetching a wallet for a protected update.
 
 ```java
 @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -192,134 +96,96 @@ The wallet repository uses a pessimistic write lock:
 Optional<Wallet> findByIdWithLock(@Param("id") Long id);
 ```
 
-This requests a database write lock when retrieving a wallet, helping prevent conflicting concurrent updates to the selected row.
+This requests a database-level write lock on the selected wallet row, helping prevent conflicting concurrent updates.
 
 ### Transaction Management
 
-The service uses `@Transactional` for deposit and transfer operations.
+The service uses `@Transactional` for deposit and transfer operations so that related database changes can be committed or rolled back together.
 
-Transactional processing groups related database changes so that qualifying failures can trigger a rollback instead of leaving partial updates.
+## 🧪 Concurrency Testing
 
-The effectiveness of concurrency control depends on the transaction boundaries, locking strategy, and database behaviour for all rows involved in a transfer.
+The application includes a concurrency test using JUnit, Spring Boot, `ExecutorService`, and `CountDownLatch`.
 
-## 🧪 Automated Testing
+The test creates two users, deposits 1000.00 into Alice's wallet, and executes 100 concurrent transfers of 1.00 each from Alice to Bob.
 
-The project includes JUnit 5 testing for concurrent transfer behaviour.
+### Test Results
 
-The concurrency test should verify:
+| Metric | Result |
+|---|---:|
+| Initial Alice Balance | 1000.00 |
+| Number of Transfers | 100 |
+| Successful Transfers | 100 |
+| Amount Per Transfer | 1.00 |
+| Alice Final Balance | 900.00 |
+| Bob Final Balance | 100.00 |
+| Test Status | PASSED |
 
-- Expected final balances.
-- Consistency of the combined wallet balance.
-- Correct handling of concurrent requests.
-- Correct behaviour when a transfer cannot be completed.
+### Key Observations
 
-To run the tests locally, use the Maven test command described below. Confirm the test results in your IDE or build output before making claims about the number of successful concurrent transfers.
+- All 100 transfer requests completed successfully in the test run.
+- Alice's balance decreased by 100.00.
+- Bob's balance increased by 100.00.
+- The actual final balances matched the expected balances.
+
+These results demonstrate correct balance updates in this test scenario under concurrent transfer requests. They do not, by themselves, guarantee correctness under every possible workload or production condition.
 
 ## 🗄️ Database Design
 
-The project uses PostgreSQL with Spring Data JPA and Hibernate.
+The application uses entities to represent the following data:
 
-The main entities include:
-
-- **User:** Stores user details.
-- **Wallet:** Stores the wallet balance and its associated user.
+- **User:** Stores user information such as name and email.
+- **Wallet:** Stores wallet balances and the associated user.
 - **Transaction:** Records wallet operations such as deposits and transfers.
 
-Wallet balances use Java's `BigDecimal`, which is appropriate for representing decimal monetary values without the usual binary floating-point rounding issues.
+A wallet is associated with a user, and transaction records help track money movements.
 
-## 💻 Running the Project Locally
+## ▶️ Running Locally
 
 ### Prerequisites
 
-- Java 17
-- PostgreSQL
-- Maven, or the Maven Wrapper included in the repository
+- Java 17 or a compatible JDK.
+- Maven.
+- A configured database, or the project's local H2 configuration.
 
-### Step 1: Clone the Repository
+### Steps
 
-```bash
-git clone https://github.com/utkarshswastikshree-source/paywithoutbank.git
-cd paywithoutbank
-```
+1. Clone the repository.
 
-### Step 2: Configure the Database
+   ```bash
+   git clone https://github.com/utkarshswastikshree-source/paywithoutbank.git
+   ```
 
-Configure the PostgreSQL connection in:
+2. Open the project in IntelliJ IDEA or another Java IDE.
 
-`src/main/resources/application.properties`
+3. Configure the required database settings in `application.properties`.
 
-Use your own database URL, username, and password. Keep credentials and other secrets out of GitHub.
+4. Run the Spring Boot application using the IDE or Maven.
 
-### Step 3: Run the Application
+   ```bash
+   mvn spring-boot:run
+   ```
 
-On Windows, if the Maven Wrapper is present:
+5. Open Swagger UI to explore the API endpoints.
 
-```bash
-mvnw.cmd spring-boot:run
-```
+   ```text
+   http://localhost:8080/swagger-ui/index.html
+   ```
 
-Alternatively, if Maven is installed:
+## 📚 What I Learned
 
-```bash
-mvn spring-boot:run
-```
-
-### Step 4: Open Swagger UI
-
-Visit:
-
-http://localhost:8080/swagger-ui/index.html
-
-You can then explore and test the available endpoints.
-
-## ✅ Running Automated Tests
-
-On Windows, if the Maven Wrapper is available:
-
-```bash
-mvnw.cmd test
-```
-
-Alternatively:
-
-```bash
-mvn test
-```
-
-Review the test output and confirm that all expected assertions pass.
-
-## 🔐 Security and Limitations
-
-PayWithoutBank is an educational backend project, not a production banking system.
-
-Before any production use, additional work would be required for:
-
-- Authentication and authorization.
-- Strong input validation and error handling.
-- More comprehensive concurrency and integration testing.
-- Secure secret management.
-- Monitoring, logging, and operational safeguards.
-- Appropriate financial compliance and security reviews.
-
-Use test data only. Do not use this demonstration application to store real financial information or handle real money.
-
-## 🔮 Future Improvements
-
-- Implement authentication and role-based authorization.
-- Add transaction history and pagination APIs.
-- Expand integration and concurrency test coverage.
-- Improve error responses and request validation.
-- Add structured logging and monitoring.
-- Improve deployment automation and production security.
-
-These items are possible future enhancements and are not claims that they have already been implemented.
+- Designing REST APIs with Spring Boot.
+- Implementing database persistence using Spring Data JPA.
+- Managing transactional money transfers.
+- Using pessimistic locking for concurrent wallet updates.
+- Writing automated tests with JUnit and Spring Boot.
+- Deploying a backend application and connecting it to a hosted database.
 
 ## 👨‍💻 Author
 
-**Utkarsh Srivastava**  
-B.Tech Computer Science and Engineering  
-Cochin University of Science and Technology (CUSAT)
+**Utkarsh Srivastava**
+
+GitHub: [@utkarshswastikshree-source](https://github.com/utkarshswastikshree-source)
 
 ---
 
-Built as a hands-on project to explore Java backend development, REST APIs, database transactions, and concurrency control.
+If you find this project useful, feel free to explore the repository and try the live API documentation.
